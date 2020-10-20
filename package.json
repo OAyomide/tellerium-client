@@ -10,6 +10,8 @@
     "google-map-react": "^2.1.8",
     "history": "^5.0.0",
     "react": "^16.14.0",
+    "react-confirm-alert": "^2.6.2",
+    "react-cookie": "^4.0.3",
     "react-dom": "^16.14.0",
     "react-dropdown-select": "^4.5.2",
     "react-images-upload": "^1.2.8",
