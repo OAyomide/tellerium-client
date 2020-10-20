@@ -3,13 +3,16 @@ import Header from '../components/Header'
 import Select from 'react-dropdown-select'
 import { useHistory } from 'react-router-dom'
 import Modal from 'react-modal'
-import ImageUploader from 'react-images-upload'
+import Dropzone from 'react-dropzone-uploader'
+import 'react-dropzone-uploader/dist/styles.css'
 import axios from 'axios'
-import { BASE_URL } from '../config'
+import { BASE_URL, DropdownOptions } from '../config'
+import { UploadImagesToFirebase } from '../util'
 import { Cookies } from 'react-cookie'
-
 const cookies = new Cookies()
-function Landing() {
+
+
+function Landing(props) {
   const history = useHistory()
 
   const [isOpen, setIsOpen] = useState(false)
@@ -27,109 +30,223 @@ function Landing() {
   const [newMarketName, setNewMarketName] = useState('')
   const [loggedIn, setLoggedIn] = useState(false)
   const [accessToken, setAccessToken] = useState('')
+  const [geoEnabled, setGeoEnabled] = useState(false)
+
+  const [imageUploadError, setImagUploadError] = useState('')
+  const [disableNewMarketButton, setDisableNewMarketButton] = useState(true)
 
   useEffect(() => {
-    (async () => {
+    const init = async () => {
       const token = cookies.get('token')
       if (token) {
         setAccessToken(token)
-        setLoggedIn(false)
+        setLoggedIn(true)
       }
-    })()
+
+      if ("geolocation" in navigator) {
+        const permissions = await navigator.permissions.query({ name: 'geolocation' })
+        if (permissions.state == "granted") {
+          setGeoEnabled(true)
+          setGeoEnabled(true)
+          navigator.geolocation.getCurrentPosition(position => {
+            console.log(`Latittude is: `, position?.coords?.latitude)
+            console.log(`Longitude is: `, position?.coords?.longitude)
+            setCoordinates([position.coords.longitude, position.coords.latitude])
+          })
+        } else {
+          navigator.geolocation.getCurrentPosition(position => {
+            console.log(`Latittude is: `, position?.coords?.latitude)
+            console.log(`Longitude is: `, position?.coords?.longitude)
+            setCoordinates([position.coords.longitude, position.coords.latitude])
+            setGeoEnabled(true)
+          }, error => console.log(`Error gettig potion: `, error))
+        }
+      } else {
+        alert('Your browser does not support location.')
+      }
+    }
+
+    init()
   }, [])
 
   useEffect(() => {
-    (async () => {
+    const searchByMarketName = async () => {
       try {
         setLoading(true)
-        console.log(market)
-        if (!market) {
-          console.log(`Empty.. noop`)
-        }
-        const { data } = await axios.get(`${BASE_URL}/api/market/search/markets?name=${market}&category=${category}&nearest=${searchByProximity}&userCoordinates=${coordinates}`)
-        console.log(data)
+        const { data } = await axios.get(`${BASE_URL}/api/market/search/markets?name=${market}`)
         setMarkets(data)
         setLoading(false)
       } catch (error) {
+        console.log(`Error searching`)
         console.log(error)
         setLoading(false)
       }
-    })()
+    }
+    searchByMarketName()
   }, [market])
 
-  const addNewMarket = async () => {
+  useEffect(() => {
+    const proximitySearch = async () => {
+      try {
+        if (searchByProximity) {
+          setLoading(true)
+          setMarkets([])
+          const { data } = await axios.get(`${BASE_URL}/api/market/search/markets?userCoordinates=${JSON.stringify(coordinates)}&nearest=${searchByProximity}`)
+          console.log(`Data is: `, data)
+          setMarkets(data)
+          setLoading(false)
+        }
+        setLoading(false)
+      } catch (error) {
+        console.log(`Error searching`)
+        console.log(error)
+        if (error?.response?.status == 400) {
+
+        }
+        setLoading(false)
+      }
+    }
+    proximitySearch()
+  }, [searchByProximity])
+
+  useEffect(() => {
+    const categorySearch = async () => {
+      try {
+        if (category) {
+          setLoading(true)
+          setMarkets([])
+          const { data } = await axios.get(`${BASE_URL}/api/market/search/markets?category=${category}`)
+          setMarkets(data)
+          setLoading(false)
+        }
+      } catch (error) {
+        console.log(`Error searching`)
+        console.log(error)
+        setLoading(false)
+      }
+    }
+    categorySearch()
+  }, [category])
+
+  let set = new Set()
+  const imageSelectStatusChange = async ({ meta, file }, status) => {
+    if (set.size <= 3) {
+      set.add(meta?.previewUrl)
+    }
+    setDisableNewMarketButton(false)
+    console.log(`ALready more than 3`)
+  }
+
+
+  const addNewMarket = async (e) => {
+    e.preventDefault()
     try {
+      setDisableNewMarketButton(true)
+      const firebaseImages = await UploadImagesToFirebase(set)
       const body = {
         name: newMarketName,
         description: newMarketDescription,
         category: newMarketCategory,
         address: newMarketAddress,
-        images
+        images: firebaseImages
       }
 
-      const { data: creationData } = await axios.post(`${BASE_URL}/api/market`, body, {
+      await axios.post(`${BASE_URL}/api/market`, body, {
         headers: {
           'Authorization': `Bearer ${accessToken}`
         }
       })
-      console.log(`ID of new market is: ${creationData?.id}`)
+
+      window.location = "/"
+      setDisableNewMarketButton(false)
     } catch (error) {
-      console.log(`Error adding new market`)
+      console.log(error?.response)
+      setDisableNewMarketButton(false)
+      if (error?.response?.status === 400) {
+        alert('Could not geocode your address. Please enter another one')
+        return
+      }
+      alert('Error creating new market. Please try again')
     }
   }
 
-  const options = [{ value: 'spices', label: 'Spices' }, { value: 'foodstuff', label: 'Food Stuff' }, { value: 'pepper', label: 'Pepper', value: 'fishandmeat', label: 'Fish and Meat', value: 'other', label: 'Others' }]
+
+
+
   return (
-    <div className="flex h-screen w-screen flex-col flex-1">
-      <Header />
-      <Modal isOpen={isOpen} onRequestClose={e => setIsOpen(false)}>
-
-        <div className="flex flex-col">
-          <form action="g" method="post" className="flex justify-center flex-col md:mx-112 mx-2">
-            <input type="text" name="name" id="name" placeholder="Enter market name" className="my-2 border border-black px-1 py-2 rounded" />
-            <input type="text" name="description" id="descr" placeholder="Enter market description" className="my-3 border border-black px-1 py-8 rounded" onChange={e => setNewMarketDescription(e.target.value)} />
-            <input type="text" name="address" id="addr" placeholder="Address" className="border border-black rounded px-1 py-1" onChange={e => setNewMarketAddress(e.target.value)} />
-            <Select options={options} clearable className="my-3" onChange={e => setNewMarketCategory(e[0]?.value)} />
-            <ImageUploader imgExtension={['.jpg', '.png']} withIcon={true} buttonText="Select images" maxFileSize={5242880} onChange={e => setImages(images.concat(e))} withPreview={true} />
-            <div className="text-center">
-              <button className="bg-black text-white items rounded-md md:px-32 px-10 py-3 uppercase">Add market</button>
-            </div>
-          </form>
-        </div>
-      </Modal>
+    <div>
 
 
-      <div className="w-full flex xl:items-start flex-col my-10 sm:mx-5">
 
-        <div className="flex flex-col md:flex-row md:mx-32 mt-5 xl:mx-88">
-          <input type="search" name="search" id="searchbox" placeholder="Search for markets"
-            onChange={async e => setMarket(e.target.value)}
-            className="border border-black focus:border-indigo-600 focus:border-opacity-0 px-3 py-1 rounded w-auto" />
-          <Select options={options} className="md:ml-1 sm:mt-2 md:mt-0 lg:mt-0 xl:mt-0" clearable onChange={e => setCategory(e[0]?.value)} />
-          <div className="flex-row">
-            <input type="checkbox" name="search by proximity" id="prox" className="ml-2 mt-3" onChange={e => setSearchByProximity(!searchByProximity)} />
-            <label htmlFor="prox" className="ml-2 mt-2">Search by proximity</label>
+      <div className="flex flex-col">
+        <Header />
+        <div className="mx-10 flex flex-col lg:mt-24 md:mt-24">
+
+          <div className="flex flex-wrap sm:flex-col text-gray-500 md:flex-col lg:flex-row xl:flex-row md:mx-24 xl:justify-center md:justify-center">
+            <input type="search" name="search" id="searchbox" placeholder="Search for markets"
+              onChange={async e => setMarket(e.target.value)}
+              className="border  focus:outline-none focus:border-opacity-0 px-3 py-1 rounded bg-transparent text-white md:my-5" />
+
+
+            <Select options={DropdownOptions} className="md:ml-1 sm:mt-2 md:mt-0 lg:mt-0 xl:mt-5 xl:ml-3 text-gray-500" clearable onChange={e => setCategory(e[0]?.value)} />
+            {geoEnabled ? <div className="flex-row xl:mt-3">
+              <input type="checkbox" name="search by proximity" id="prox" className="ml-2 mt-3 md:mt-5 xl:ml-5 xl:mt-5" onChange={e => setSearchByProximity(!searchByProximity)} />
+              <label htmlFor="prox" className="ml-2 mt-2 text-gray-500 xl:mt-5">Around me</label>
+            </div> : <span>Please enable location</span>}
           </div>
+
+          <div className="flex flex-row justify-center">
+            {loggedIn && <button className="md:mx-32 xl:mx-88 bg-teal-500 px-5 py-3 rounded-md mt-10 text-white" onClick={e => setIsOpen(true)}>Add New Market</button>}
+          </div>
+          {markets.length == 0 && !loading ? <span className="text-gray-500 my-10 text-center">No market found</span> :
+            <div className="flex md:justify-center sm:flex-col md:flex-row lg:flex-row xl:flex-row">
+              {markets.map((singlemarket, index) => {
+                return (
+
+                  <section className="flex px-2 mt-5" key={index}>
+                    <div
+                      className="wrapper max-w-xs bg-gray-50 rounded-b-md shadow-lg overflow-hidden"
+                    >
+                      <div>
+                        <img src="https://cdn.pixabay.com/photo/2016/05/24/16/48/mountains-1412683_1280.png" alt="montaña" />
+                      </div>
+                      <div className="p-3 space-y-3">
+                        <h3 className="text-gray-400 font-semibold text-md">
+                          {singlemarket?.name}
+                        </h3>
+                        <p className="text-sm text-gray-600 leading-sm">
+                          {singlemarket?.description}
+                        </p>
+                      </div>
+                      <button
+                        className="bg-teal-600 w-full flex justify-center py-2 text-white font-semibold transition duration-300 hover:bg-teal-500" onClick={e => history.push(`/market/${singlemarket?._id}`)}>Enter Market</button>
+                    </div>
+                  </section>
+                )
+              })}
+            </div>}
         </div>
 
+        <Modal isOpen={isOpen} onRequestClose={e => setIsOpen(false)} style={{
+          content: {
+            backgroundColor: '#364145',
+          }
+        }}>
 
-        <div className="w-full my-10">
-          <button className="md:mx-32 xl:mx-88 bg-black text-white px-3 py-3 rounded-md" onClick={e => setIsOpen(true)}>Add New Market</button>
-          {markets.length === 0 && !loading ? <span>No market found</span> : markets.map((x, y) => {
-            return (
-              <div className="flex flex-col shadow-md my-3 mx-1 md:mx-32 xl:mx-88 py-2 px-2 cursor-pointer" onClick={e => history.push(`/market/${x?._id}`)} key={y} data-id={x?._id} >
-                <div className="flex flex-row">
-                  <img src={"https://via.placeholder.com/150"} alt="shopimage" style={{ width: 50, height: 50, borderRadius: 25 }} />
-                  <div className="flex flex-col mt-1 mx-3">
-                    <span>{x?.name}</span>
-                    <span>{x?.description}</span>
-                  </div>
-                </div>
+          <div className="flex flex-col bg-gray-1000">
+            <form className="flex justify-center flex-col md:mx-10 mx-2">
+              <input type="text" name="name" id="name" placeholder="Enter market name" className="my-2 border px-1 py-2 rounded bg-transparent" onChange={e => setNewMarketName(e.target.value)} />
+              <input type="text" name="description" id="descr" placeholder="Enter market description" className="my-3 border px-1 py-8 rounded bg-transparent" onChange={e => setNewMarketDescription(e.target.value)} />
+              <input type="text" name="address" id="addr" placeholder="Address" className="border bg-transparent  rounded px-1 py-1" onChange={e => setNewMarketAddress(e.target.value)} />
+              <Select options={DropdownOptions} clearable className="my-3" onChange={e => setNewMarketCategory(e[0]?.value)} />
+              <Dropzone onChangeStatus={imageSelectStatusChange} accept="image/png" submitButtonDisabled />
+              <div className="text-center">
+                <span className="text-white my-3">Uploading your photos.. please hold on</span>
+                <button className="bg-teal-500 text-white items rounded-md md:px-32 px-10 py-3 uppercase mt-5" onClick={async e => await addNewMarket(e)} disabled={disableNewMarketButton}>Add market</button>
               </div>
-            )
-          })}
-          {loading && <span>Loading...</span>}
-        </div>
+            </form>
+          </div>
+        </Modal>
       </div>
     </div>
   )

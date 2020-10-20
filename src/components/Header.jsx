@@ -11,8 +11,8 @@ function Header() {
 
   return (
     <div>
-      <header className="flex flex-row mx-5 xl:mx-88 md:mx-32 cursor-pointer justify-between" onClick={e => window.location = "/"}>
-        <h1 className="text-6xl text-black sm:text-3xl lg:ml-0 mt-2">Tellerrium Test</h1>
+      <header className="flex flex-row mx-10 mb-10 xl:mx-112 md:mx-32 justify-between">
+        <h1 className="text-6xl text-white sm:text-3xl lg:ml-0 mt-2 cursor-pointer" onClick={e => window.location = "/"}>Tellerium</h1>
 
         {token ? null : <div className="block lg:hidden md:hidden" onClick={e => history.push('/login')}>
           <span className="text-white px-2 mt-5 cursor-pointer">

@@ -1,1 +1,2 @@
-export const BASE_URL = `https://a397f41a8e3b.ngrok.io`
+export const BASE_URL = `http://localhost:5600`
+export const DropdownOptions = [{ value: 'spices', label: 'Spices' }, { value: 'foodstuff', label: 'Food Stuff' }, { value: 'pepper', label: 'Pepper', value: 'fishandmeat', label: 'Fish and Meat', value: 'other', label: 'Others' }]
