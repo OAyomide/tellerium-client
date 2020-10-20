@@ -162,7 +162,7 @@ function Market(props) {
       {loading ? <span className="flex flex-row items-center">Loading..</span> : <div className="w-full flex md:items-center flex-col mt-6">
         <div className="flex flex-row mx-32 sm:mx-5">
           <Carousel>
-            {marketData?.images && <img src={marketData?.images[0] ?? "https://via.placeholder.com/150"} alt="Image of market" />}
+            {marketData?.images && marketData?.images?.map((img, index) => <img src={img ?? "https://via.placeholder.com/150"} alt="Image of market" key={index} />)}
           </Carousel>
         </div>
 

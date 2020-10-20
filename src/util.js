@@ -1,4 +1,4 @@
-import firebase from 'firebase'
+import firebase, { storage } from 'firebase'
 import { v4 as uuid } from 'uuid'
 const firebaseConfig = {
   apiKey: "AIzaSyCdJY8bOitOoUj3TfoSuLi6awr32633Pb8",
@@ -20,8 +20,9 @@ export async function UploadImagesToFirebase(images) {
     for (let image of images) {
       const randomRef = uuid()
       let fetchBlobURL = await (await fetch(image)).blob()
-      await fbStorage.ref(randomRef).put(fetchBlobURL)
-      const url = await fbStorage.ref(randomRef).getDownloadURL()
+      await storage(fbClient).ref(randomRef).put(fetchBlobURL)
+      const url = await storage(fbClient).ref(randomRef).getDownloadURL()
+      console.log(`Download URL`, url)
       uploadedURL.push(url)
     }
 

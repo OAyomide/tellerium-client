@@ -208,7 +208,7 @@ function Landing(props) {
                       className="wrapper max-w-xs bg-gray-50 rounded-b-md shadow-lg overflow-hidden"
                     >
                       <div>
-                        <img src="https://cdn.pixabay.com/photo/2016/05/24/16/48/mountains-1412683_1280.png" alt="montaña" />
+                        <img src={singlemarket?.images[0]} alt="market-image" />
                       </div>
                       <div className="p-3 space-y-3">
                         <h3 className="text-gray-400 font-semibold text-md">
